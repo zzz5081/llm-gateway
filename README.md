@@ -219,8 +219,9 @@ python -m pytest -v
 tests/test_smoke.py    3 个  健康检查 / 响应头 / 404
 tests/test_auth.py     5 个  注册 / 重复注册 409 / 登录 / 密码错 401 / 无 token 401
 tests/test_chat.py     2 个  chat 成功落库 / LLM 挂掉返回 502 且记 status='failed'
+tests/test_usage.py    3 个  空用户全 0 / 一次成功后的数字 / 失败调用只算 failed
                       ─────
-                      10 个  全绿
+                      13 个  全绿
 ```
 
 **测试的几个做法：**
@@ -233,8 +234,27 @@ tests/test_chat.py     2 个  chat 成功落库 / LLM 挂掉返回 502 且记 st
   assert "[mock]" in r.json()["reply"]        # 只 assert 非空抓不到"回显用户输入"的 bug
   assert len(rows) == 1                        # 同时抓「漏写」和「重复记账」
   assert "RuntimeError" not in r.text          # 锁住"别把异常原文吐给客户端"
+  assert Decimal(j["total_cost"]) == 0         # 断言值，不断言字面格式
   ```
+- **断言用 `j["key"]`，不用 `j.get("key", 0)`**：
+  键名写错时，`[...]` 会抛 `KeyError`（响亮地失败），`.get()` 会静默返回默认值（假通过）
 - **跑完查库**：`pytest` 全绿不代表数据库干净，清理失效是静默的 —— 每次跑完对一下 `COUNT(*)`
+
+### 变异测试：证明测试有牙齿
+
+测试写完不代表有效，要**故意把代码改坏，看测试会不会红**。
+
+```
+正常代码                        13 passed
+变异 1：COALESCE(SUM(cost),0)  只有 test_usage_for_new_user 变红
+        → SUM(cost)                 （空集返回 NULL → total_cost 是 None → 500）
+变异 2：COUNT(CASE WHEN ...    只有 test_usage_counts_failed 变红
+        → COUNT(*)                  （失败的调用被算进了 success → assert 1 == 0）
+```
+
+**三个测试各管一段，没有一个多余**；两个变异都被杀掉，说明覆盖到了关键行为。
+测试「红了」叫**杀死变异**，「还是绿」叫**存活变异** —— 存活越多，测试越虚。
+
 
 ---
 

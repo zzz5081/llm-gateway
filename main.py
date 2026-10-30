@@ -5,7 +5,7 @@ import time
 from fastapi import Request
 from fastapi.middleware.cors import CORSMiddleware
 from routers.usage import router as usage_route
-app = FastAPI(title="Todo API")
+app = FastAPI(title="LLM Gateway API")
 
 app.add_middleware(
     CORSMiddleware,

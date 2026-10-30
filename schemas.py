@@ -18,19 +18,6 @@ class TokenOut(BaseModel):
     access_token: str
     token_type: str = "bearer"
 
-class TodoIn(BaseModel):
-    title: str = Field(min_length=1,max_length=200)
-
-class TodoUpdate(BaseModel):
-    title :str | None = Field(default=None,min_length=1,max_length=200)
-    done: bool | None = None
-
-class TodoOut(BaseModel):
-    id :int
-    title :str
-    done :bool
-    model_config = {"from_attributes": True}
-
 class ChatIn(BaseModel):
     prompt: str = Field(min_length=1,max_length=2000)
     model: str = DEFAULT_MODEL

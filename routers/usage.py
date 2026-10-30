@@ -12,7 +12,7 @@ router = APIRouter(prefix="/v1",tags=["gateway"])
 def usage(db: Session = Depends(get_db), current_user = Depends(get_current_user)):
     rows = db.execute(text("""
 SELECT
-    COUNT(CASE WHEN created_at >= CURDATE() AND status='success' THEN 1 END) AS today_success,
+    COUNT(CASE WHEN created_at >= CURDATE() AND status = 'success' THEN 1 END ) AS today_success,
     COUNT(CASE WHEN created_at >= CURDATE() AND status='failed' THEN 1 END) AS today_failed,
     COUNT(CASE WHEN created_at >= DATE_FORMAT(CURDATE(),'%Y-%m-01') AND status = 'success' THEN 1 END) AS month_success,
     COUNT(CASE WHEN created_at >= DATE_FORMAT(CURDATE(),'%Y-%m-01') AND status = 'failed' THEN 1 END) AS month_failed,
