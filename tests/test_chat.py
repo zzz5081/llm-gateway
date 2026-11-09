@@ -3,6 +3,8 @@ from sqlalchemy import select
 from llm_client import chat_completion
 import routers.chat
 from db import ApiCall
+from decimal import Decimal
+
 def test_chat_success(client, auth_user):
     r = client.post("/v1/chat",
                     json={"prompt": "第二句话"},
@@ -42,3 +44,12 @@ def test_chat_when_llm_down(client,auth_user,monkeypatch):
     assert rows[0].status == "failed"
     assert rows[0].prompt_tokens == 0
     assert rows[0].cost == 0
+
+def test_chat_cost_matches_db(client,auth_user):
+    r = client.post("/v1/chat",json = {"prompt": "hi"}, headers=auth_user["headers"])
+    assert r.status_code == 200
+
+    uid = client.get("/auth/me",headers=auth_user["headers"]).json()['id']
+    with db.SessionLocal() as s:
+        row = s.scalars(select(ApiCall).where(ApiCall.user_id == uid)).one()
+    assert Decimal(r.json()["cost"]) == row.cost

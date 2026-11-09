@@ -1,0 +1,50 @@
+services:
+  # ---------- 数据库 ----------
+  mysql:
+    image: mysql:8.0
+    container_name: gw-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root123456
+      MYSQL_DATABASE: llm_gateway_db
+      MYSQL_USER: dev
+      MYSQL_PASSWORD: dev123456
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot123456"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # ---------- 缓存 / 限流 ----------
+  redis:
+    image: redis:7-alpine
+    container_name: gw-redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ---------- 你的应用 ----------
+  app:
+    build: .
+    container_name: gw-app
+    ports:
+      - "8000:8000"
+    environment:
+      APP_SECRET: "dev-secret-in-compose-please-change-in-production"
+      # ★ 关键：host 写服务名 mysql，不是 localhost
+      DATABASE_URL: "mysql+pymysql://dev:dev123456@mysql:3306/llm_gateway_db?charset=utf8mb4"
+      # ★ 关键：host 写服务名 redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  mysql_data:

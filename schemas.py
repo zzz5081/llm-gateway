@@ -29,6 +29,7 @@ class ChatOut(BaseModel):
     prompt_tokens: int
     completion_tokens: int
     cost: Decimal
+    cached: bool = False
 
 class UsageOut(BaseModel):
     today_success: int

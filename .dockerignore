@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.vscode/
+.env
+.git/
+tests/
+conftest.py
+try_chat.py
+redis_demo.py
+reset_db.py
+*.log

@@ -1,7 +1,15 @@
+import os
 import sys
 from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
+
+# ★ 必须在 import main 之前设置：
+#   llm_client.py 里的 LLM_MODE 是在【模块被 import 的那一刻】读进内存的，
+#   之后再改环境变量它也不认（这就是为什么改 LLM_MODE 必须重启服务）。
+#   测试永远跑 mock，不受 shell 里残留的 LLM_MODE=real 影响。
+os.environ["LLM_MODE"] = "mock"
+
 sys.path.insert(0, str(Path(__file__).parent))
 from main import app
 import secrets
@@ -11,6 +19,33 @@ from sqlalchemy import text
 @pytest.fixture
 def client():
     return TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def clean_redis():
+    """
+    每个测试开始前清掉 Redis 里的【缓存】和【限流计数】。
+
+    ★ 为什么要这么做：
+      缓存和限流计数都是「测试之外的状态」。不清掉会导致两类假结果：
+
+      1. 缓存残留 → 请求命中缓存 → 【不调 LLM】
+         → monkeypatch 注入的故障不会触发
+         → test_chat_when_llm_down 会返回 200 而不是 502（测试名不副实）
+         → 用量类测试也会因为"没写库"而失败
+
+      2. 限流计数残留 → 累积到第 11 次 chat 调用就 429
+         → 出现莫名其妙的失败
+
+    → 这是「测试依赖外部状态」家族的第四类：
+      ① 数据残留（MySQL）② 顺序依赖 ③ 环境残留（LLM_MODE）④ 缓存残留（Redis）
+    """
+    from ratelimit import r
+    for pattern in ("cache:*", "rl:*"):
+        keys = r.keys(pattern)
+        if keys:
+            r.delete(*keys)
+    yield
 
 
 @pytest.fixture
@@ -68,3 +103,22 @@ def make_user(client,cleanup):
         token = r.json()["access_token"]
         return {"username": name, "headers": {"Authorization": f"Bearer {token}"}}
     return _make
+
+@pytest.fixture(autouse=True)
+def clean_redis():
+    """
+    每个测试开始前清掉 Redis 里的【缓存】和【限流计数】。
+
+    ★ 为什么要这么做：
+      缓存和限流计数都是「测试之外的状态」。
+      不清掉的话：
+        · 上个测试/上次运行留下的缓存 → 本次请求命中缓存 → 不调 LLM
+          → monkeypatch 注入的故障不会触发 → 测试名不副实
+        · 限流计数累积 → 跑到第 11 个 chat 调用就 429 → 莫名其妙的失败
+    """
+    from ratelimit import r
+    for pattern in ("cache:*", "rl:*"):
+        keys = r.keys(pattern)
+        if keys:
+            r.delete(*keys)
+    yield
