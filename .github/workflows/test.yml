@@ -1,0 +1,56 @@
+name: tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_reuquest:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root123456
+          MYSQL_DATABASE: llm_gateway_db
+          MYSQL_USER: dev
+          MYSQL_PASSWORD: dev123456
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot123456"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=20
+        
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+      
+    env:
+      APP_SECRET: python -c "import secrets; print(secrets.token_hex(32))"
+      DATABASE_URL: mysql+pymysql://dev:dev123456@3306:3306/llm_gateway_db?charset=utf8mb4
+      REDIS_HOST: 127.0.0.1
+      REDIS_PORT: "6379"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - user: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+        
+      - name: 装依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest httpx
+      
+      - name: 建表
+        run: python -c "from db import init_db; init_db()"
+
+      - name: 跑测试
+        run: python -m pytest -v
