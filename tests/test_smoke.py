@@ -1,6 +1,6 @@
 def test_health_body(client):
     r = client.get("/health")
-    assert r.json() == {"status":"ok"}
+    assert r.json() == {"status":"WRONG"}
 
 def test_response_has_process_time(client):
     r = client.get("/health")
