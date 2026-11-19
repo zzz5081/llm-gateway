@@ -1,11 +1,13 @@
 # LLM 调用网关 + 用量统计
 
+[![tests](https://github.com/zzz5081/llm-gateway/actions/workflows/test.yml/badge.svg)](https://github.com/zzz5081/llm-gateway/actions/workflows/test.yml)
+
 一个基于 **FastAPI** 的大模型统一调用服务：给内部多个应用提供「统一调大模型」的后端能力 ——
 **集中管理调用、记录 token 与费用、查询用量**。
 
 🌐 **线上演示**：<http://162.14.105.155:8000/docs> （腾讯云轻量 · Docker 三容器编排）
 
-> 个人学习项目。技术栈与项目结构按生产后端的方式组织：鉴权、记账、限流、缓存、异常分支、接口测试、容器化部署。
+> 个人学习项目。技术栈与项目结构按生产后端的方式组织：鉴权、记账、限流、缓存、异常分支、接口测试、CI、容器化部署。
 >
 > ⚠️ 演示环境跑的是 `LLM_MODE=mock`（不调真实 API、不产生费用），里面是测试数据。
 
@@ -344,6 +346,48 @@ tests/test_cache.py    2 个  命中缓存不记账 / temperature>0 不缓存
 **三个测试各管一段，没有一个多余**；两个变异都被杀掉，说明覆盖到了关键行为。
 测试「红了」叫**杀死变异**，「还是绿」叫**存活变异** —— 存活越多，测试越虚。
 
+
+---
+
+## 持续集成（GitHub Actions）
+
+[![tests](https://github.com/zzz5081/llm-gateway/actions/workflows/test.yml/badge.svg)](https://github.com/zzz5081/llm-gateway/actions/workflows/test.yml)
+
+每次 `push` 到 `main` 或提 PR，GitHub 会自动开一台干净的 Ubuntu，把整个测试流程跑一遍（约 50 秒）。
+
+```
+.github/workflows/test.yml
+  ├─ services: 起 MySQL 8.0 + Redis 7 容器（CI 机器上没有任何本地服务）
+  ├─ env:      注入 APP_SECRET / DATABASE_URL / REDIS_HOST（CI 上没有 .env）
+  ├─ 装依赖    requirements.txt（运行依赖）
+  │            + pytest httpx（开发依赖，故意不放进 requirements.txt）
+  ├─ 建表      python -c "from db import init_db; init_db()"
+  └─ 跑测试    python -m pytest -v        →  16 passed
+```
+
+### 在 CI 里遇到的三个「本地有、CI 没有」
+
+| 本地有 | CI 里 | 解法 |
+|---|---|---|
+| MySQL / Memurai 服务 | 空机器 | `services:` 起容器，端口映射到 runner 的 `3306/6379` |
+| `.env` 里的 `APP_SECRET` | 没有（也不该有，密钥不进仓库） | `env:` 注入一个**假的**固定值，仅用于测试 |
+| 已经建好的表 | 空数据库 | 用幂等、无交互的 `init_db()` |
+
+> **为什么建表用 `init_db()` 而不是 `reset_db.py`：**
+> `reset_db.py` 里有 `input("输入 yes 继续")` 做二次确认，而 **CI 是无交互环境**，
+> `input()` 会直接抛 `EOFError: EOF when reading a line`。
+> 另外 `init_db()` 走 `create_all`（只建不存在的表），幂等；`reset_db.py` 是 `DROP` 重建，破坏性。
+
+### CI 自身也做过「变异测试」
+
+只看到绿色不能说明 CI 在跑测试，也可能是它压根没执行。所以验证过一次：
+
+```
+把 tests/test_smoke.py 里的 assert 故意改错  →  CI 变红 ❌   （说明它真的在跑）
+改回来                                      →  CI 变绿 ✅
+```
+
+两次运行记录留在 Actions 页面里，可以直接查。
 
 ---
 
