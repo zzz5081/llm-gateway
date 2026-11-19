@@ -31,8 +31,8 @@ jobs:
           - 6379:6379
       
     env:
-      APP_SECRET: python -c "import secrets; print(secrets.token_hex(32))"
-      DATABASE_URL: mysql+pymysql://dev:dev123456@3306:3306/llm_gateway_db?charset=utf8mb4
+      APP_SECRET: ci-not-a-real-secret-for-tests-only-0123456789abcdef
+      DATABASE_URL: mysql+pymysql://dev:dev123456@127.0.0.1:3306/llm_gateway_db?charset=utf8mb4
       REDIS_HOST: 127.0.0.1
       REDIS_PORT: "6379"
 
