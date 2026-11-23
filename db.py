@@ -12,7 +12,7 @@ URL = os.environ.get(
     "mysql+pymysql://dev:dev123456@localhost/llm_gateway_db?charset=utf8mb4",
 )
 
-engine = create_engine(URL,echo=False)
+engine = create_engine(URL,echo=False,pool_pre_ping = True)
 SessionLocal = sessionmaker(bind=engine)
 
 class Base(DeclarativeBase):
