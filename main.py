@@ -5,6 +5,15 @@ import time
 from fastapi import Request
 from fastapi.middleware.cors import CORSMiddleware
 from routers.usage import router as usage_route
+from fastapi import Depends, HTTPException
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+from db import get_db
+from ratelimit import r
+import logging
+
+logger = logging.getLogger(__name__)
+
 app = FastAPI(title="LLM Gateway API")
 
 app.add_middleware(
@@ -20,7 +29,13 @@ app.include_router(chat_router)
 app.include_router(usage_route)
 
 @app.get("/health")
-def health():
+def health(db: Session = Depends(get_db)):
+    try:
+        db.execute(text("SELECT 1"))
+        r.ping()
+    except Exception:
+        logger.exception("health check failed")
+        raise HTTPException(status_code = 503,detail="dependency unavailable")     
     return {'status':'ok'}
 
 @app.middleware("http")
